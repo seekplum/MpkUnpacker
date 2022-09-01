@@ -2,7 +2,7 @@ from io import FileIO, SEEK_CUR
 
 from util.io_helper import IOHelper
 
-MPK_MAGIC = 'MPK'
+MPK_MAGIC = 'TPKG'
 MPK_VERSION = 131072
 
 
@@ -17,20 +17,31 @@ class MPK:
         instance = MPK(io)
         magic = IOHelper.read_ascii_string(io, 4)
         if magic == MPK_MAGIC:
-            version, count = IOHelper.read_struct(io, '<2i')
-            io.seek(52, SEEK_CUR)
+            version = IOHelper.read_struct(io, '<i')[0]
+            io.seek(1, SEEK_CUR)
+            count = IOHelper.read_struct(io, '>i')[0]
+
+            # io.seek(52, SEEK_CUR)
             instance.set_version(version)
             for i in range(count):
-                is_zip, index, offset, data_size, zip_size = IOHelper.read_struct(io, '<2i3q')
-                name_data = io.read(224)
-                name = name_data[:name_data.find(b'\x00')].decode(encoding='ascii')
+                if i==0:
+                    size = '>i'
+                else:
+                    size='i'
+                name_length = IOHelper.read_struct(io, size)[0]
+                if i==0:
+                    io.seek(3, SEEK_CUR)
+                file_data = IOHelper.read_struct(io, '<'+str(name_length)+'s')[0]
+                file_name = bytes(file_data).decode(encoding='ascii')
+                offset = IOHelper.read_struct(io, '=i')[0]
+                data_size = IOHelper.read_struct(io, '=i')[0]
+                print(file_name)
                 instance.insert_file({
-                    'is_zip': is_zip != 0,
-                    'index': index,
+                    'is_zip': False,
+                    'index': i,
                     'offset': offset,
                     'data_size': data_size,
-                    'zip_size': zip_size,
-                    'name': name,
+                    'name': file_name,
                     'data': None,
                 })
 
